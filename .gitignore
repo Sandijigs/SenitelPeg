@@ -1,0 +1,21 @@
+# Compiler output
+out/
+cache/
+
+# Dependencies (installed via forge install)
+lib/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+lcov.info
+coverage/
