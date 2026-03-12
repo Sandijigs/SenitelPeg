@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "SentinelPeg — Depeg Defense Dashboard",
@@ -13,8 +19,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-[#0a0e17] text-gray-200 min-h-screen antialiased">
+    <html lang="en" className={inter.variable}>
+      <body
+        className="font-sans min-h-screen antialiased text-white overflow-x-hidden"
+        style={{ background: "var(--bg-primary)" }}
+      >
         {children}
       </body>
     </html>

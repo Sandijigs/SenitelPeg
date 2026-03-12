@@ -36,19 +36,18 @@ export function useWallet(addLog: (msg: string) => void) {
       setAddress(addr);
       setSigner(s);
       setContract(hookContract);
-      addLog(`Wallet connected: ${addr}`);
+      addLog(`Wallet connected: ${addr.slice(0, 6)}...${addr.slice(-4)}`);
 
-      // Try reading on-chain state
       try {
         const [sev, drift, , stale] = await hookContract.getDepegState(STABLECOIN);
-        if (stale) addLog("Depeg data is STALE — using conservative fees");
+        if (stale) addLog("Depeg data is STALE");
         return {
           severity: Number(sev),
           driftBps: Number(drift),
           isStale: Boolean(stale),
         } as DepegState;
       } catch {
-        addLog("Could not read on-chain state (expected in demo mode)");
+        addLog("On-chain read skipped (demo mode)");
       }
     } catch (err) {
       addLog(`Connection failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -62,11 +61,11 @@ export function useWallet(addLog: (msg: string) => void) {
       if (!contract) return;
 
       try {
-        addLog("Sending tx to setDepegState...");
+        addLog("Sending setDepegState tx...");
         const tx = await contract.setDepegState(STABLECOIN, severity, driftBps);
-        addLog(`Tx hash: ${tx.hash}`);
+        addLog(`Tx: ${tx.hash.slice(0, 10)}...`);
         await tx.wait();
-        addLog("State updated on-chain");
+        addLog("Confirmed on-chain");
       } catch (err: unknown) {
         const reason = (err as { reason?: string })?.reason;
         const message = err instanceof Error ? err.message : String(err);
@@ -76,12 +75,5 @@ export function useWallet(addLog: (msg: string) => void) {
     [contract, addLog],
   );
 
-  return {
-    address,
-    isConnected: !!address,
-    signer,
-    contract,
-    connect,
-    simulateOnChain,
-  };
+  return { address, isConnected: !!address, signer, contract, connect, simulateOnChain };
 }
