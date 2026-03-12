@@ -49,10 +49,20 @@ else
   echo "ℹ️   .env already exists, skipping"
 fi
 
-# ── 4. Build ─────────────────────────────────────────────────
+# ── 4. Build contracts ──────────────────────────────────────
 echo ""
 echo "🔨  Building contracts…"
 forge build
+
+# ── 5. Install frontend dependencies ───────────────────────
+echo ""
+echo "📦  Installing frontend dependencies…"
+if command -v npm >/dev/null 2>&1; then
+  (cd frontend && npm install)
+  echo "✅  Frontend dependencies installed"
+else
+  echo "⚠️   npm not found — skip frontend install (install Node.js 18+ to use the dashboard)"
+fi
 
 echo ""
 echo "═══════════════════════════════════════════════════════════"
@@ -60,7 +70,8 @@ echo "  ✅  SentinelPeg setup complete!"
 echo ""
 echo "  Next steps:"
 echo "    1. Fill in .env with your private keys & RPC URLs"
-echo "    2. Run tests:     forge test -vvv"
-echo "    3. Deploy hook:   forge script script/DeployHook.s.sol --broadcast"
-echo "    4. Deploy reactive: forge script script/DeployReactive.s.sol --broadcast"
+echo "    2. Run tests:       forge test -vvv"
+echo "    3. Run dashboard:   cd frontend && npm run dev"
+echo "    4. Deploy hook:     forge script script/DeployHook.s.sol --broadcast"
+echo "    5. Deploy reactive: See README.md for forge create command"
 echo "═══════════════════════════════════════════════════════════"

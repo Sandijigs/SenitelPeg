@@ -102,7 +102,7 @@ contract SentinelPegReactive {
     address public  callbackTarget;      // SentinelPegHook on destination
     address public  stablecoinAddress;   // stablecoin on destination
     bool    public  stablecoinIsToken0;  // position in the pair
-    uint256 public  referenceEthPrice;   // expected ETH price in stablecoin base units
+    uint256 public  referenceEthPrice;   // expected ETH price in whole stablecoin units (e.g. 3000 for $3000)
 
     ISentinelPeg.DepegSeverity public lastSeverity;
     ISentinelPeg.DepegSeverity public pendingSeverity;
@@ -127,7 +127,7 @@ contract SentinelPegReactive {
     /// @param _callbackTarget      SentinelPegHook address on destination chain
     /// @param _stablecoin          Stablecoin address (used in callback payload)
     /// @param _stablecoinIsToken0  Is the stablecoin token0 in the pair?
-    /// @param _refEthPrice         Reference ETH price in stablecoin units (e.g. 3000e6)
+    /// @param _refEthPrice         Reference ETH price in whole stablecoin units (e.g. 3000 for $3000/ETH)
     constructor(
         uint256 _originChainId,
         uint256 _destinationChainId,
@@ -232,7 +232,8 @@ contract SentinelPegReactive {
     ///
     ///      For a USDC (6 dec) / WETH (18 dec) pair:
     ///        impliedPrice = stablecoinReserve × 10^12 / ethReserve
-    ///      This gives the price of 1 ETH in stablecoin base units (6 decimals).
+    ///      The 10^12 factor normalises the decimal gap (18 − 6 = 12), giving
+    ///      the price of 1 ETH in whole stablecoin units (e.g. 3000 = $3000).
     function _calcDriftBps(uint112 r0, uint112 r1) internal view returns (uint256) {
         if (r0 == 0 || r1 == 0 || referenceEthPrice == 0) return 0;
 
@@ -246,7 +247,7 @@ contract SentinelPegReactive {
             ethRes    = uint256(r0);
         }
 
-        // impliedPrice has same unit as referenceEthPrice (stablecoin base units per 1 ETH)
+        // impliedPrice has same unit as referenceEthPrice (whole stablecoin units per 1 ETH)
         uint256 impliedPrice = (stableRes * 1e12) / ethRes;
 
         uint256 diff = impliedPrice > referenceEthPrice

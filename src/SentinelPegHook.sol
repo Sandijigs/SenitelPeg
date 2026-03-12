@@ -8,6 +8,7 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
+import {SwapParams} from "v4-core/src/types/PoolOperation.sol";
 import {ISentinelPeg} from "./interfaces/ISentinelPeg.sol";
 
 /// @title SentinelPegHook
@@ -33,6 +34,7 @@ import {ISentinelPeg} from "./interfaces/ISentinelPeg.sol";
 ///          infrastructure on Unichain (chain ID 130).
 contract SentinelPegHook is BaseHook, ISentinelPeg {
     using PoolIdLibrary for PoolKey;
+    using LPFeeLibrary for uint24;
 
     // ─────────────────────────────────────────────────────────
     //  Constants
@@ -88,8 +90,9 @@ contract SentinelPegHook is BaseHook, ISentinelPeg {
     //  Constructor
     // ─────────────────────────────────────────────────────────
 
-    constructor(IPoolManager _pm) BaseHook(_pm) {
-        owner = msg.sender;
+    constructor(IPoolManager _pm, address _owner) BaseHook(_pm) {
+        if (_owner == address(0)) revert ZeroAddress();
+        owner = _owner;
         stalenessThreshold = DEFAULT_STALENESS;
     }
 
@@ -134,7 +137,7 @@ contract SentinelPegHook is BaseHook, ISentinelPeg {
     function _beforeSwap(
         address,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata,
+        SwapParams calldata,
         bytes calldata
     )
         internal override returns (bytes4, BeforeSwapDelta, uint24)

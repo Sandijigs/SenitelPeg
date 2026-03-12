@@ -8,56 +8,65 @@ import {SentinelPegReactive} from "../src/SentinelPegReactive.sol";
 /// @notice Deploys SentinelPegReactive to the Reactive Network.
 ///
 /// @dev The constructor automatically subscribes to Sync events on the origin chain
-///      via the Reactive Network system contract.  Ensure the deployer account has
-///      enough REACT tokens for callback gas payments.
+///      via the Reactive Network system contract. Ensure the deployer account has
+///      enough REACT tokens for callback gas payments (0.1 ether sent with deployment).
 ///
 ///      Usage:
 ///        source .env
 ///        forge script script/DeployReactive.s.sol \
 ///          --rpc-url $REACTIVE_RPC_URL \
 ///          --private-key $REACTIVE_PRIVATE_KEY \
-///          --broadcast \
-///          --value 0.01ether
+///          --broadcast
 contract DeployReactive is Script {
-
-    // ── Origin chain config (Ethereum mainnet) ───────────────
-    uint256 constant ORIGIN_CHAIN_ID = 1;
-
-    // Uniswap V2 USDC/ETH pool on Ethereum
-    address constant USDC_ETH_POOL = 0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc;
-    bool    constant STABLECOIN_IS_TOKEN0 = true;
-
-    // ── Destination chain config (Unichain) ──────────────────
-    uint256 constant DESTINATION_CHAIN_ID = 130;
-
-    // SentinelPegHook address on Unichain  (fill after deploying hook)
-    address constant HOOK_ADDRESS = address(0);     // TODO: set after hook deployment
-
-    // Stablecoin address that the hook tracks
-    address constant STABLECOIN = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;  // USDC
-
-    // Reference ETH price in USDC base units (6 decimals). $3 000 = 3000e6
-    uint256 constant REF_ETH_PRICE = 3000e6;
-
     function run() external {
-        require(HOOK_ADDRESS != address(0), "Set HOOK_ADDRESS first");
+        // ── Read config from environment ─────────────────────────
+        uint256 originChainId      = vm.envUint("ETHEREUM_CHAIN_ID");
+        uint256 destinationChainId = vm.envUint("UNICHAIN_CHAIN_ID");
+        address usdcEthPool        = vm.envAddress("USDC_ETH_POOL");
+        address hookAddress        = vm.envAddress("HOOK_ADDRESS");
+        address stablecoin         = vm.envAddress("USDC_ADDRESS");
+        bool    stablecoinIsToken0 = vm.envBool("STABLECOIN_IS_TOKEN0");
+        uint256 refEthPrice        = vm.envUint("REFERENCE_ETH_PRICE");
 
+        // ── Validate ─────────────────────────────────────────────
+        require(hookAddress != address(0), "HOOK_ADDRESS not set in .env - deploy hook first");
+        require(usdcEthPool != address(0), "USDC_ETH_POOL not set in .env");
+        require(stablecoin != address(0), "USDC_ADDRESS not set in .env");
+        require(refEthPrice > 0, "REFERENCE_ETH_PRICE must be > 0");
+
+        console.log("Deploying SentinelPegReactive...");
+        console.log("  Origin chain:     ", originChainId);
+        console.log("  Destination chain: ", destinationChainId);
+        console.log("  Monitored pool:   ", usdcEthPool);
+        console.log("  Callback target:  ", hookAddress);
+        console.log("  Stablecoin:       ", stablecoin);
+        console.log("  Ref ETH price:    $%s", vm.toString(refEthPrice));
+
+        // ── Deploy ───────────────────────────────────────────────
         vm.startBroadcast();
 
-        SentinelPegReactive reactive = new SentinelPegReactive{value: 0.01 ether}(
-            ORIGIN_CHAIN_ID,
-            DESTINATION_CHAIN_ID,
-            USDC_ETH_POOL,
-            HOOK_ADDRESS,
-            STABLECOIN,
-            STABLECOIN_IS_TOKEN0,
-            REF_ETH_PRICE
+        SentinelPegReactive reactive = new SentinelPegReactive{value: 0.1 ether}(
+            originChainId,
+            destinationChainId,
+            usdcEthPool,
+            hookAddress,
+            stablecoin,
+            stablecoinIsToken0,
+            refEthPrice
         );
 
         vm.stopBroadcast();
 
-        console.log("SentinelPegReactive deployed at:", address(reactive));
-        console.log("Monitoring pool:", USDC_ETH_POOL);
-        console.log("Callback target:", HOOK_ADDRESS);
+        // ── Output ───────────────────────────────────────────────
+        console.log("");
+        console.log("=== SentinelPeg Reactive Deployed ===");
+        console.log("  Reactive address:", address(reactive));
+        console.log("  Monitoring pool: ", usdcEthPool);
+        console.log("  Callback target: ", hookAddress);
+        console.log("");
+        console.log("Next steps:");
+        console.log("  1. Set REACTIVE_CONTRACT_ADDRESS=%s in .env", vm.toString(address(reactive)));
+        console.log("  2. On Unichain, register pool & set callback source:");
+        console.log("     cast send $HOOK_ADDRESS 'setCallbackSource(address)' <REACTIVE_CALLBACK_PROXY>");
     }
 }

@@ -24,7 +24,7 @@ contract SentinelPegReactiveTest is Test {
     address constant HOOK          = address(0x2222);
     address constant USDC_ADDR     = address(0xA11CE);
     bool    constant IS_TOKEN0     = true;
-    uint256 constant REF_ETH_PRICE = 3000e6;     // $3 000 USDC per ETH
+    uint256 constant REF_ETH_PRICE = 3000;        // implied price from formula: stableRes * 1e12 / ethRes
 
     function setUp() public {
         // ── No code at SERVICE_ADDR → constructor takes ReactVM branch ──
@@ -63,7 +63,7 @@ contract SentinelPegReactiveTest is Test {
     // ═════════════════════════════════════════════════════════
 
     /// Helper: build a LogRecord with Sync event data
-    function _syncLog(uint112 r0, uint112 r1) internal pure returns (SentinelPegReactive.LogRecord memory) {
+    function _syncLog(uint112 r0, uint112 r1) internal view returns (SentinelPegReactive.LogRecord memory) {
         return SentinelPegReactive.LogRecord({
             chain_id:     ORIGIN,
             _contract:    POOL,
@@ -82,15 +82,9 @@ contract SentinelPegReactiveTest is Test {
 
     /// Reserves that imply ETH = $3 000 → 0 % drift → NONE
     function test_noDrift() public {
-        // USDC reserve = 3 000 000e6, WETH reserve = 1 000e18
-        // impliedPrice = 3_000_000e6 * 1e12 / 1_000e18 = 3_000e6
-        // drift = |3000e6 - 3000e6| / 3000e6 = 0
-        uint112 usdcRes = 3_000_000e6;
-        uint112 wethRes = 1_000e18 > type(uint112).max ? type(uint112).max : uint112(1_000 * 1e18);
-
-        // Reserves that produce exactly the reference price can't be
-        // represented trivially with uint112 (1000e18 > uint112 max).
-        // Use smaller numbers: 3000e6 USDC / 1e18 WETH → price = 3000e6
+        // 3000 USDC (in 6-dec base units) / 1 WETH (in 18-dec base units)
+        // impliedPrice = 3000e6 * 1e12 / 1e18 = 3000  (whole USDC)
+        // drift = |3000 - 3000| / 3000 = 0
         uint112 r0 = 3000e6;
         uint112 r1 = 1e18;
 
@@ -101,7 +95,7 @@ contract SentinelPegReactiveTest is Test {
 
     /// Reserves implying ~1 % drift → MILD after 2 confirmations
     function test_mildDepeg() public {
-        // target: 1 % drift → implied price = 3000e6 * 1.01 = 3030e6
+        // target: 1 % drift → implied price = 3000 * 1.01 = 3030
         // impliedPrice = r0 * 1e12 / r1  ⇒  r0 = 3030e6, r1 = 1e18
         uint112 r0 = 3030e6;
         uint112 r1 = 1e18;
@@ -117,7 +111,7 @@ contract SentinelPegReactiveTest is Test {
 
     /// Reserves implying ~3 % drift → SEVERE after 2 confirmations
     function test_severeDepeg() public {
-        // 3 % drift: implied = 3000e6 * 1.03 = 3090e6
+        // 3 % drift: implied = 3000 * 1.03 = 3090
         uint112 r0 = 3090e6;
         uint112 r1 = 1e18;
 
@@ -128,7 +122,7 @@ contract SentinelPegReactiveTest is Test {
 
     /// Reserves implying ~6 % drift → CRITICAL (immediate, no confirmation)
     function test_criticalDepeg() public {
-        // 6 % drift: implied = 3000e6 * 1.06 = 3180e6
+        // 6 % drift: implied = 3000 * 1.06 = 3180
         uint112 r0 = 3180e6;
         uint112 r1 = 1e18;
 
@@ -139,7 +133,7 @@ contract SentinelPegReactiveTest is Test {
 
     /// Negative drift (price drops) is handled identically
     function test_negativeDrift() public {
-        // -3 % drift: implied = 3000e6 * 0.97 = 2910e6
+        // -3 % drift: implied = 3000 * 0.97 = 2910
         uint112 r0 = 2910e6;
         uint112 r1 = 1e18;
 

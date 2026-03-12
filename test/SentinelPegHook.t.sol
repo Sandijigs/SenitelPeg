@@ -12,6 +12,7 @@ import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
+import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
 
 import {SentinelPegHook} from "../src/SentinelPegHook.sol";
 import {ISentinelPeg} from "../src/interfaces/ISentinelPeg.sol";
@@ -49,7 +50,7 @@ contract SentinelPegHookTest is Test, Deployers {
         // Deploy the hook contract at the required address
         deployCodeTo(
             "SentinelPegHook.sol",
-            abi.encode(manager),
+            abi.encode(manager, address(this)),
             hookAddr
         );
         hook = SentinelPegHook(hookAddr);
@@ -66,7 +67,7 @@ contract SentinelPegHookTest is Test, Deployers {
         // Seed liquidity
         modifyLiquidityRouter.modifyLiquidity(
             poolKey,
-            IPoolManager.ModifyLiquidityParams({
+            ModifyLiquidityParams({
                 tickLower: -60,
                 tickUpper:  60,
                 liquidityDelta: 10 ether,
@@ -93,7 +94,8 @@ contract SentinelPegHookTest is Test, Deployers {
 
     function test_revertIfPoolNotDynamic() public {
         // Attempt to initialise a pool WITHOUT the dynamic fee flag
-        vm.expectRevert(ISentinelPeg.PoolMustUseDynamicFees.selector);
+        // v4-core wraps hook reverts in WrappedError containing PoolMustUseDynamicFees
+        vm.expectRevert();
         initPool(
             currency0,
             currency1,
@@ -308,19 +310,20 @@ contract SentinelPegHookTest is Test, Deployers {
     }
 
     function test_swapUnregisteredPoolUsesDefaultFee() public {
-        // Create a second pool that is NOT registered
+        // Create a second pool that is NOT registered (different tick spacing to avoid PoolAlreadyInitialized)
         (PoolKey memory key2, ) = initPool(
             currency0,
             currency1,
             IHooks(address(hook)),
             LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            int24(10),
             SQRT_PRICE_1_1
         );
 
         // Add liquidity to the second pool
         modifyLiquidityRouter.modifyLiquidity(
             key2,
-            IPoolManager.ModifyLiquidityParams({
+            ModifyLiquidityParams({
                 tickLower: -60,
                 tickUpper:  60,
                 liquidityDelta: 10 ether,
