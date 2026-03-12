@@ -12,10 +12,10 @@ export function FeeCard({ severity }: FeeCardProps) {
       <h2 className="text-sm text-gray-400 uppercase tracking-wider mb-4">
         Active Fee Tier
       </h2>
-      <div className="text-3xl font-bold">{config.feePct}</div>
-      <div className="h-2 rounded bg-gray-800 mt-3 overflow-hidden">
+      <div className={`text-3xl font-bold transition-colors duration-500 ${config.color}`}>{config.feePct}</div>
+      <div className="h-3 rounded bg-gray-800 mt-3 overflow-hidden">
         <div
-          className={`h-full rounded transition-all duration-400 ${config.barColor}`}
+          className={`h-full rounded transition-all duration-700 ease-out ${config.barColor}`}
           style={{ width: config.barWidth }}
         />
       </div>
