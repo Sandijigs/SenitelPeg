@@ -1,62 +1,30 @@
-import { HOOK_ADDRESS } from "@/lib/constants";
-
-const LINKS = [
-  { label: "GitHub", href: "https://github.com/Sandijigs/SenitelPeg" },
-  { label: "Hook on Blockscout", href: `https://unichain-sepolia.blockscout.com/address/${HOOK_ADDRESS}` },
-  { label: "Reactive Network", href: "https://reactive.network" },
-  { label: "Unichain", href: "https://unichain.org" },
-];
+import { HOOK_ADDRESS, EXPLORER_URL } from "@/lib/constants";
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/[0.03] py-12 px-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xs font-bold">
-              S
-            </div>
-            <span className="text-xs font-semibold text-white/50">
-              SentinelPeg
-            </span>
+    <footer className="border-t border-white/[0.03] py-10 px-6">
+      <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[10px] font-bold">
+            S
           </div>
-
-          {/* Links */}
-          <div className="flex items-center gap-6">
-            {LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-white/25 hover:text-white/60 transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
+          <span className="text-sm text-white/40">SentinelPeg</span>
+          <span className="text-xs text-white/20">&mdash; Hookathon UHI8</span>
         </div>
 
-        {/* Partners */}
-        <div className="mt-8 pt-8 border-t border-white/[0.03] flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-[11px] text-white/15">
-            Hookathon UHI8 &mdash; Specialized Markets
-          </p>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              <span className="text-[11px] text-white/20">Uniswap v4</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              <span className="text-[11px] text-white/20">Unichain</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-              <span className="text-[11px] text-white/20">Reactive Network</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-5">
+          <a href="https://github.com/Sandijigs/SentinelPeg" target="_blank" rel="noopener noreferrer"
+            className="text-sm text-white/30 hover:text-white/60 transition-colors">
+            GitHub
+          </a>
+          <a href={`${EXPLORER_URL}/address/${HOOK_ADDRESS}`} target="_blank" rel="noopener noreferrer"
+            className="text-sm text-white/30 hover:text-white/60 transition-colors">
+            Contract
+          </a>
+          <a href="https://reactive.network" target="_blank" rel="noopener noreferrer"
+            className="text-sm text-white/30 hover:text-white/60 transition-colors">
+            Reactive Network
+          </a>
         </div>
       </div>
     </footer>
