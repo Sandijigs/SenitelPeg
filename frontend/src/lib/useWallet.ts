@@ -77,18 +77,22 @@ export function useWallet(addLog: (msg: string) => void) {
 
         // Read secondary values individually so one failure doesn't break everything
         let fee = 0;
-        let locked = false;
         let totalVol = "0";
 
         try { fee = Number(await c.getCurrentFee(STABLECOIN)); } catch { /* default 0 */ }
-        try { locked = Boolean(await c.isLiquidityLocked(STABLECOIN)); } catch { /* default false */ }
         try { totalVol = (await c.totalProtectedVolume()).toString(); } catch { /* default "0" */ }
 
+        // Derive locked state from severity + staleness (same logic as contract)
+        // CRITICAL (3) + not stale = liquidity locked
+        const severity = Number(sev);
+        const isStale = Boolean(stale);
+        const locked = severity === 3 && !isStale;
+
         return {
-          severity: Number(sev),
+          severity,
           driftBps: Number(drift),
           updatedAt: Number(updatedAt),
-          isStale: Boolean(stale),
+          isStale,
           currentFeeBps: fee,
           liquidityLocked: locked,
           totalProtectedVolume: totalVol,

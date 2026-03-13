@@ -24,17 +24,21 @@ SentinelPeg combines **Uniswap v4 dynamic fee hooks** with **Reactive Network's 
 
 1. A **Reactive Smart Contract** on Reactive Network continuously monitors stablecoin pool reserves on Ethereum (or other origin chains)
 2. When price deviation is detected, the reactive contract classifies severity and sends a **cross-chain callback** to the hook on Unichain
-3. The **SentinelPeg hook** adjusts swap fees in real-time via `beforeSwap`, protecting LPs with graduated fee tiers:
+3. The **SentinelPeg hook** responds across three Uniswap v4 hook points:
 
-| Severity | Price Drift | Fee | Rationale |
-|----------|-------------|-----|-----------|
-| **NONE** | < 0.5% | 0.05% | Normal operation — competitive fees |
-| **MILD** | 0.5% – 2% | 0.30% | Elevated risk — compensate LPs |
-| **SEVERE** | 2% – 5% | 1.00% | High risk — discourage pool draining |
-| **CRITICAL** | > 5% | 5.00% | Crisis mode — maximum LP protection |
-| **STALE** | data too old | 0.30% | Conservative fallback |
+   - **`beforeSwap`** — reads current severity and returns a dynamic fee override to the PoolManager
+   - **`afterSwap`** — tracks cumulative swap volume during depeg events (protected volume metric)
+   - **`beforeRemoveLiquidity`** — blocks LP withdrawals during CRITICAL depeg to prevent bank runs
 
-Fees automatically return to normal as peg stability is restored.
+| Severity | Price Drift | Fee | LP Withdrawals | Rationale |
+|----------|-------------|-----|----------------|-----------|
+| **NONE** | < 0.5% | 0.05% | Open | Normal operation — competitive fees |
+| **MILD** | 0.5% – 2% | 0.30% | Open | Elevated risk — compensate LPs |
+| **SEVERE** | 2% – 5% | 1.00% | Open | High risk — discourage pool draining |
+| **CRITICAL** | > 5% | 5.00% | **Blocked** | Crisis mode — maximum LP protection |
+| **STALE** | data too old | 0.30% | Open | Conservative fallback |
+
+Fees automatically return to normal and LP withdrawals re-open as peg stability is restored.
 
 ---
 
@@ -82,6 +86,12 @@ Fees automatically return to normal as peg stability is restored.
 │    │    → reads current severity              │          │
 │    │    → checks staleness                    │          │
 │    │    → returns fee override to PoolManager │          │
+│    │                                          │          │
+│    │  afterSwap():                            │          │
+│    │    → tracks cumulative protected volume  │          │
+│    │                                          │          │
+│    │  beforeRemoveLiquidity():                │          │
+│    │    → blocks LP withdrawals at CRITICAL   │          │
 │    └──────────────────────────────────────────┘          │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
@@ -96,6 +106,9 @@ Fees automatically return to normal as peg stability is restored.
 | SentinelPegHook | Unichain Sepolia | [`0x8051EE84c86dBa66e72Bf51336e6059D41aa6080`](https://unichain-sepolia.blockscout.com/address/0x8051EE84c86dBa66e72Bf51336e6059D41aa6080) |
 | SentinelPegReactive | Reactive Lasna | [`0x330eFe22a73AAD374b887d6F77cd90fa16b6cC60`](https://lasna.reactscan.net/address/0x330eFe22a73AAD374b887d6F77cd90fa16b6cC60) |
 | Callback Proxy | Unichain Sepolia | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4` |
+| spUSD (test stablecoin) | Unichain Sepolia | [`0x03540C0af2350218C206168e0F758450Db84e179`](https://unichain-sepolia.blockscout.com/address/0x03540C0af2350218C206168e0F758450Db84e179) |
+| spETH (test token) | Unichain Sepolia | [`0x891Fc6d2dFEd0f5ff4Db00690eB552eB029564a8`](https://unichain-sepolia.blockscout.com/address/0x891Fc6d2dFEd0f5ff4Db00690eB552eB029564a8) |
+| PoolSwapTest (router) | Unichain Sepolia | [`0xE626df117052511f5bF4E5299e317AFFfD5949Cd`](https://unichain-sepolia.blockscout.com/address/0xE626df117052511f5bF4E5299e317AFFfD5949Cd) |
 
 ---
 
@@ -129,22 +142,23 @@ SentinelPeg is designed and optimized as **Unichain-native stablecoin infrastruc
 ```
 sentinelpeg/
 ├── src/
-│   ├── SentinelPegHook.sol           # Uniswap v4 hook — dynamic fee logic
+│   ├── SentinelPegHook.sol           # Uniswap v4 hook — dynamic fees, volume tracking, LP guard
 │   ├── SentinelPegReactive.sol       # Reactive Network — cross-chain monitor
 │   └── interfaces/
 │       └── ISentinelPeg.sol          # Shared types, events, errors
 ├── test/
-│   ├── SentinelPegHook.t.sol         # Hook unit tests (32 tests)
+│   ├── SentinelPegHook.t.sol         # Hook unit tests (42 tests)
 │   ├── SentinelPegReactive.t.sol     # Reactive contract tests (13 tests)
-│   └── SentinelPegE2E.t.sol          # End-to-end integration tests (9 tests)
+│   └── SentinelPegE2E.t.sol          # End-to-end integration tests (11 tests)
 ├── script/
 │   ├── DeployHook.s.sol              # Deploy hook to Unichain (CREATE2 + HookMiner)
 │   ├── DeployReactive.s.sol          # Deploy reactive contract to Reactive Network
+│   ├── DeployTestPool.s.sol          # Deploy test tokens + initialize Uniswap v4 pool
 │   └── ConfigureHook.s.sol           # Post-deployment: register pool + set callback
 ├── frontend/                         # Next.js dashboard (React 19, Tailwind v4)
 │   ├── src/
 │   │   ├── app/                      # Next.js App Router pages
-│   │   ├── components/               # UI components (severity, fees, simulation)
+│   │   ├── components/               # Dashboard, swap UI, depeg controls, status cards
 │   │   └── lib/                      # Contract ABI, types, wallet hook
 │   ├── package.json
 │   └── next.config.ts
@@ -179,16 +193,16 @@ This installs all Solidity dependencies (v4-core, v4-periphery, forge-std, OpenZ
 ### Run Tests
 
 ```bash
-# All 54 tests
+# All 66 tests
 forge test -vvv
 
-# Only hook tests (32 tests)
+# Only hook tests (42 tests)
 forge test --match-contract SentinelPegHookTest -vvv
 
 # Only reactive contract tests (13 tests)
 forge test --match-contract SentinelPegReactiveTest -vvv
 
-# End-to-end integration tests (9 tests)
+# End-to-end integration tests (11 tests)
 forge test --match-contract SentinelPegE2ETest -vvv
 
 # With gas reporting
@@ -204,7 +218,13 @@ npm run dev
 # Dashboard available at http://localhost:3000
 ```
 
-The dashboard connects to the deployed hook via MetaMask, showing real-time depeg severity, fee tiers, and a simulation panel for testing depeg scenarios.
+The dashboard connects to the deployed hook on Unichain Sepolia via MetaMask. It supports:
+
+- **Live on-chain state** — reads severity, fee, drift, LP lock status directly from the hook contract
+- **Real token swaps** — execute swaps through the SentinelPeg hook via PoolSwapTest router
+- **Depeg scenario testing** — trigger NONE / MILD / SEVERE / CRITICAL on-chain and see fees change in real-time
+- **Test token minting** — mint spUSD and spETH (MockERC20) for testing
+- **Activity log** — tracks all transactions with links to Blockscout
 
 ---
 
@@ -233,7 +253,7 @@ The project is configured for testnet deployment across three networks:
 
 ### Step 1: Deploy Hook to Unichain Sepolia
 
-The hook address must encode permission bits for `beforeInitialize` and `beforeSwap`. The deploy script uses `HookMiner` with CREATE2 to find a valid address.
+The hook address must encode permission bits for `beforeInitialize`, `beforeSwap`, `afterSwap`, and `beforeRemoveLiquidity`. The deploy script uses `HookMiner` with CREATE2 to find a valid address.
 
 ```bash
 source .env
@@ -305,7 +325,9 @@ forge script script/ConfigureHook.s.sol \
 6. **Reactive Network relays** the callback as a transaction to `SentinelPegHook.updateDepegState()` on Unichain Sepolia
 7. **The hook stores** the new severity, drift, and timestamp
 8. **On every subsequent swap**, `beforeSwap()` reads the severity and returns the appropriate fee override to the PoolManager
-9. **If the data becomes stale** (no update for >1 hour), the hook falls back to a conservative fee tier
+9. **After each swap**, `afterSwap()` tracks cumulative swap volume during active depeg events (the "protected volume" metric)
+10. **If a LP tries to withdraw** during CRITICAL severity, `beforeRemoveLiquidity()` reverts the transaction to prevent bank-run dynamics
+11. **If the data becomes stale** (no update for >1 hour), the hook falls back to a conservative fee tier and LP withdrawals re-open
 
 ---
 
@@ -326,17 +348,20 @@ Uniswap v4's dynamic fee system requires hooks to explicitly signal that they're
 **Why `_owner` constructor parameter?**
 The hook is deployed via CREATE2 (required for address-encoded permission bits). With CREATE2, `msg.sender` in the constructor is the CREATE2 proxy, not the deployer wallet. Passing the owner explicitly ensures the correct address has admin control.
 
+**Why LP withdrawal blocking at CRITICAL?**
+During a severe depeg, LPs racing to exit create a bank-run dynamic that deepens the crisis and leaves slower participants with concentrated losses. By blocking `beforeRemoveLiquidity` at CRITICAL severity, the hook keeps liquidity in the pool — protecting both LPs and swappers. Withdrawals automatically re-open when severity drops or data becomes stale, so LPs are never permanently locked.
+
 ---
 
 ## Test Coverage
 
-**54 tests across 3 test suites — all passing.**
+**66 tests across 3 test suites — all passing.**
 
 | Suite | Tests | Description |
 |-------|-------|-------------|
-| `SentinelPegHookTest` | 32 | Hook deployment, fee tiers, staleness, access control, events, swap integration, multi-stablecoin support, edge cases |
+| `SentinelPegHookTest` | 42 | Hook deployment, fee tiers, staleness, access control, events, swap integration, volume tracking, LP withdrawal blocking, multi-stablecoin support, edge cases |
 | `SentinelPegReactiveTest` | 13 | Constructor config, severity classification, confirmation logic, callback emission, edge cases |
-| `SentinelPegE2ETest` | 9 | Full pipeline: reactive event → hook state → fee override → swap execution |
+| `SentinelPegE2ETest` | 11 | Full pipeline: reactive event → hook state → fee override → swap execution, LP withdrawal blocking under depeg |
 
 ---
 
