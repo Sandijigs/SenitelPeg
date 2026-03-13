@@ -38,6 +38,12 @@ interface ISentinelPeg {
     /// @notice Fired when a pool is registered for monitoring
     event PoolRegistered(bytes32 indexed poolId, address indexed stablecoin);
 
+    /// @notice Fired when a swap is completed and volume is tracked during depeg
+    event SwapTracked(bytes32 indexed poolId, uint8 severity, uint256 absVolume, uint256 cumulativeVolume);
+
+    /// @notice Fired when a liquidity removal is blocked during CRITICAL depeg
+    event LiquidityRemovalBlocked(bytes32 indexed poolId, address indexed sender, uint8 severity);
+
     // ═══════════════════════════════════════════════════════════
     //                        ERRORS
     // ═══════════════════════════════════════════════════════════
@@ -47,4 +53,5 @@ interface ISentinelPeg {
     error ZeroAddress();
     error PoolMustUseDynamicFees();
     error StalenessThresholdTooLow();
+    error LiquidityRemovalBlockedDuringDepeg();
 }

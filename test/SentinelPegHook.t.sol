@@ -44,7 +44,12 @@ contract SentinelPegHookTest is Test, Deployers {
         deployMintAndApprove2Currencies();
 
         // Compute the hook address that encodes the right permission bits
-        uint160 flags = uint160(Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG);
+        uint160 flags = uint160(
+            Hooks.BEFORE_INITIALIZE_FLAG
+            | Hooks.BEFORE_SWAP_FLAG
+            | Hooks.AFTER_SWAP_FLAG
+            | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+        );
         address hookAddr = address(flags);
 
         // Deploy the hook contract at the required address
@@ -376,5 +381,145 @@ contract SentinelPegHookTest is Test, Deployers {
         (, , , stale) = hook.getDepegState(USDC);
         assertFalse(stale);
         assertEq(hook.getCurrentFee(USDC), hook.FEE_MILD());
+    }
+
+    // ═════════════════════════════════════════════════════════
+    //  11.  Liquidity guard — beforeRemoveLiquidity
+    // ═════════════════════════════════════════════════════════
+
+    function test_liquidityRemovalBlockedDuringCritical() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.CRITICAL, 700);
+
+        // Attempt to remove liquidity — should revert
+        vm.expectRevert();
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -60,
+                tickUpper:  60,
+                liquidityDelta: -1 ether,
+                salt: bytes32(0)
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function test_liquidityRemovalAllowedDuringMild() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.MILD, 100);
+
+        // Should succeed — only CRITICAL blocks
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -60,
+                tickUpper:  60,
+                liquidityDelta: -1 ether,
+                salt: bytes32(0)
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function test_liquidityRemovalAllowedDuringSevere() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.SEVERE, 300);
+
+        // Should succeed — only CRITICAL blocks
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -60,
+                tickUpper:  60,
+                liquidityDelta: -1 ether,
+                salt: bytes32(0)
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function test_liquidityRemovalAllowedWhenCriticalStale() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.CRITICAL, 700);
+        vm.warp(block.timestamp + 3601); // stale — data no longer reliable
+
+        // Should succeed because stale CRITICAL is not enforced
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -60,
+                tickUpper:  60,
+                liquidityDelta: -1 ether,
+                salt: bytes32(0)
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function test_liquidityRemovalAllowedAfterRecovery() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.CRITICAL, 700);
+
+        // Recover to NONE
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.NONE, 10);
+
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -60,
+                tickUpper:  60,
+                liquidityDelta: -1 ether,
+                salt: bytes32(0)
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function test_isLiquidityLocked() public {
+        assertFalse(hook.isLiquidityLocked(USDC));
+
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.CRITICAL, 700);
+        assertTrue(hook.isLiquidityLocked(USDC));
+
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.SEVERE, 300);
+        assertFalse(hook.isLiquidityLocked(USDC));
+    }
+
+    // ═════════════════════════════════════════════════════════
+    //  12.  Protected volume tracking — afterSwap
+    // ═════════════════════════════════════════════════════════
+
+    function test_protectedVolumeTrackedDuringDepeg() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.MILD, 100);
+
+        // Swap during depeg
+        swap(poolKey, true, -0.001 ether, ZERO_BYTES);
+
+        uint256 vol = hook.getProtectedVolume(poolKey);
+        assertGt(vol, 0, "Volume should be tracked during depeg");
+        assertEq(hook.totalProtectedVolume(), vol, "Total should match pool volume");
+    }
+
+    function test_noVolumeTrackedAtNone() public {
+        // Default severity is NONE — no volume tracking
+        swap(poolKey, true, -0.001 ether, ZERO_BYTES);
+
+        uint256 vol = hook.getProtectedVolume(poolKey);
+        assertEq(vol, 0, "No volume tracked when peg is stable");
+    }
+
+    function test_volumeAccumulates() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.SEVERE, 300);
+
+        swap(poolKey, true, -0.001 ether, ZERO_BYTES);
+        uint256 vol1 = hook.getProtectedVolume(poolKey);
+
+        swap(poolKey, true, -0.001 ether, ZERO_BYTES);
+        uint256 vol2 = hook.getProtectedVolume(poolKey);
+
+        assertGt(vol2, vol1, "Volume should accumulate across swaps");
+    }
+
+    function test_totalProtectedVolumeView() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.CRITICAL, 700);
+
+        swap(poolKey, true, -0.001 ether, ZERO_BYTES);
+        assertGt(hook.totalProtectedVolume(), 0, "Total protected volume should increase");
     }
 }

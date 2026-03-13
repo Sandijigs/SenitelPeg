@@ -32,7 +32,12 @@ contract DeployHook is Script {
         require(deployer != address(0), "DEPLOYER_ADDRESS not set in .env");
 
         // ── Hook permission flags ────────────────────────────────
-        uint160 flags = uint160(Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG);
+        uint160 flags = uint160(
+            Hooks.BEFORE_INITIALIZE_FLAG
+            | Hooks.BEFORE_SWAP_FLAG
+            | Hooks.AFTER_SWAP_FLAG
+            | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+        );
 
         // ── Mine a CREATE2 salt for the correct hook address ─────
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), deployer);

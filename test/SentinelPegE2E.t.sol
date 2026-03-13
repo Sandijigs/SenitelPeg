@@ -45,7 +45,12 @@ contract SentinelPegE2ETest is Test, Deployers {
         deployMintAndApprove2Currencies();
 
         // 2. Deploy hook at permission-encoded address
-        uint160 flags = uint160(Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG);
+        uint160 flags = uint160(
+            Hooks.BEFORE_INITIALIZE_FLAG
+            | Hooks.BEFORE_SWAP_FLAG
+            | Hooks.AFTER_SWAP_FLAG
+            | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+        );
         address hookAddr = address(flags);
         deployCodeTo("SentinelPegHook.sol", abi.encode(manager, address(this)), hookAddr);
         hook = SentinelPegHook(hookAddr);
@@ -414,5 +419,82 @@ contract SentinelPegE2ETest is Test, Deployers {
         emit log_named_int("Output at MILD     (0.30%)", deltaMild.amount1());
         emit log_named_int("Output at SEVERE   (1.00%)", deltaSevere.amount1());
         emit log_named_int("Output at CRITICAL (5.00%)", deltaCritical.amount1());
+    }
+
+    // ═════════════════════════════════════════════════════════
+    //  10. Liquidity guard — LP bank-run protection
+    // ═════════════════════════════════════════════════════════
+
+    function test_e2e_liquidityLockedDuringCriticalDepeg() public {
+        // Trigger CRITICAL depeg
+        reactive.react(_syncLog(3180e6, 1e18)); // 6% drift → CRITICAL (immediate)
+        _relayCallback(ISentinelPeg.DepegSeverity.CRITICAL, 600);
+
+        // Verify liquidity is locked
+        assertTrue(hook.isLiquidityLocked(USDC_ADDR), "Liquidity should be locked during CRITICAL");
+
+        // Attempt LP withdrawal — should revert
+        vm.expectRevert();
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -60,
+                tickUpper: 60,
+                liquidityDelta: -10 ether,
+                salt: bytes32(0)
+            }),
+            ZERO_BYTES
+        );
+
+        // Swaps still work (pool operational, just expensive + locked LPs)
+        _doSwap();
+
+        // Recovery unlocks liquidity
+        _relayCallback(ISentinelPeg.DepegSeverity.NONE, 0);
+        assertFalse(hook.isLiquidityLocked(USDC_ADDR), "Liquidity should unlock after recovery");
+
+        // LP can now withdraw
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -60,
+                tickUpper: 60,
+                liquidityDelta: -10 ether,
+                salt: bytes32(0)
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    // ═════════════════════════════════════════════════════════
+    //  11. Protected volume — swap tracking during depeg
+    // ═════════════════════════════════════════════════════════
+
+    function test_e2e_protectedVolumeTracking() public {
+        // No volume tracked at NONE
+        _doSwap();
+        assertEq(hook.getProtectedVolume(poolKey), 0, "No volume at NONE");
+
+        // Escalate to MILD
+        _relayCallback(ISentinelPeg.DepegSeverity.MILD, 100);
+        _doSwap();
+        uint256 vol1 = hook.getProtectedVolume(poolKey);
+        assertGt(vol1, 0, "Volume tracked during MILD");
+
+        // Escalate to CRITICAL
+        _relayCallback(ISentinelPeg.DepegSeverity.CRITICAL, 600);
+        _doSwap();
+        uint256 vol2 = hook.getProtectedVolume(poolKey);
+        assertGt(vol2, vol1, "Volume accumulates across severity levels");
+
+        // Total matches
+        assertEq(hook.totalProtectedVolume(), vol2, "Total matches pool volume");
+
+        // Recovery — volume persists as historical record
+        _relayCallback(ISentinelPeg.DepegSeverity.NONE, 0);
+        _doSwap();
+        assertEq(hook.getProtectedVolume(poolKey), vol2, "Volume preserved after recovery");
+
+        emit log_named_uint("Total protected volume (wei)", vol2);
     }
 }

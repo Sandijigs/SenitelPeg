@@ -7,8 +7,9 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeSwapDelta.sol";
+import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
-import {SwapParams} from "v4-core/src/types/PoolOperation.sol";
+import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
 import {ISentinelPeg} from "./interfaces/ISentinelPeg.sol";
 
 /// @title SentinelPegHook
@@ -72,6 +73,12 @@ contract SentinelPegHook is BaseHook, ISentinelPeg {
     /// pool id → stablecoin tracked by that pool
     mapping(PoolId => address) public poolStablecoin;
 
+    /// pool id → cumulative swap volume (in token units) during depeg events
+    mapping(PoolId => uint256) public protectedVolume;
+
+    /// Total volume protected across all pools
+    uint256 public totalProtectedVolume;
+
     // ─────────────────────────────────────────────────────────
     //  Modifiers
     // ─────────────────────────────────────────────────────────
@@ -106,10 +113,10 @@ contract SentinelPegHook is BaseHook, ISentinelPeg {
             afterInitialize:  false,
             beforeAddLiquidity: false,
             afterAddLiquidity:  false,
-            beforeRemoveLiquidity: false,
+            beforeRemoveLiquidity: true,   // Block LP withdrawals during CRITICAL depeg
             afterRemoveLiquidity:  false,
             beforeSwap:  true,
-            afterSwap:   false,
+            afterSwap:   true,             // Track cumulative protected volume
             beforeDonate: false,
             afterDonate:  false,
             beforeSwapReturnDelta:  false,
@@ -157,6 +164,65 @@ contract SentinelPegHook is BaseHook, ISentinelPeg {
             BeforeSwapDeltaLibrary.ZERO_DELTA,
             fee | LPFeeLibrary.OVERRIDE_FEE_FLAG
         );
+    }
+
+    // ─────────────────────────────────────────────────────────
+    //  afterSwap — track cumulative protected volume
+    // ─────────────────────────────────────────────────────────
+
+    function _afterSwap(
+        address,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        BalanceDelta,
+        bytes calldata
+    )
+        internal override returns (bytes4, int128)
+    {
+        PoolId pid = key.toId();
+        address sc = poolStablecoin[pid];
+
+        if (sc != address(0)) {
+            DepegSeverity sev = depegInfo[sc].severity;
+            if (sev != DepegSeverity.NONE && !_isStale(sc)) {
+                uint256 absVolume = params.amountSpecified < 0
+                    ? uint256(-params.amountSpecified)
+                    : uint256(params.amountSpecified);
+
+                protectedVolume[pid] += absVolume;
+                totalProtectedVolume += absVolume;
+
+                emit SwapTracked(PoolId.unwrap(pid), uint8(sev), absVolume, protectedVolume[pid]);
+            }
+        }
+
+        return (this.afterSwap.selector, 0);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    //  beforeRemoveLiquidity — block withdrawals during CRITICAL depeg
+    // ─────────────────────────────────────────────────────────
+
+    function _beforeRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata,
+        bytes calldata
+    )
+        internal override returns (bytes4)
+    {
+        PoolId pid = key.toId();
+        address sc = poolStablecoin[pid];
+
+        if (sc != address(0)) {
+            DepegSeverity sev = depegInfo[sc].severity;
+            if (sev == DepegSeverity.CRITICAL && !_isStale(sc)) {
+                emit LiquidityRemovalBlocked(PoolId.unwrap(pid), sender, uint8(sev));
+                revert LiquidityRemovalBlockedDuringDepeg();
+            }
+        }
+
+        return this.beforeRemoveLiquidity.selector;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -220,6 +286,15 @@ contract SentinelPegHook is BaseHook, ISentinelPeg {
     {
         DepegInfo storage d = depegInfo[stablecoin];
         return (d.severity, d.driftBps, d.updatedAt, _isStale(stablecoin));
+    }
+
+    function getProtectedVolume(PoolKey calldata key) external view returns (uint256) {
+        return protectedVolume[key.toId()];
+    }
+
+    function isLiquidityLocked(address stablecoin) external view returns (bool) {
+        if (stablecoin == address(0)) return false;
+        return depegInfo[stablecoin].severity == DepegSeverity.CRITICAL && !_isStale(stablecoin);
     }
 
     // ─────────────────────────────────────────────────────────
