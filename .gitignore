@@ -26,3 +26,4 @@ coverage/
 # Frontend
 node_modules/
 .next/
+tsconfig.tsbuildinfo
