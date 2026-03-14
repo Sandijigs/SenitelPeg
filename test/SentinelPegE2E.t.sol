@@ -82,7 +82,7 @@ contract SentinelPegE2ETest is Test, Deployers {
         // 6. Deploy reactive contract (no code at SERVICE_ADDR → vm=true)
         reactive = new SentinelPegReactive(
             1,              // origin: Ethereum
-            130,            // destination: Unichain
+            1301,           // destination: Unichain Sepolia
             POOL_ETH,       // monitored pool
             hookAddr,       // callback target
             USDC_ADDR,      // stablecoin

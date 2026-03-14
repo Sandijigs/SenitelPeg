@@ -19,7 +19,7 @@ contract SentinelPegReactiveTest is Test {
 
     // ── Config matching a USDC/WETH V2 pool ──────────────────
     uint256 constant ORIGIN        = 1;          // Ethereum
-    uint256 constant DESTINATION   = 130;        // Unichain
+    uint256 constant DESTINATION   = 1301;       // Unichain Sepolia
     address constant POOL          = address(0x1111);
     address constant HOOK          = address(0x2222);
     address constant USDC_ADDR     = address(0xA11CE);

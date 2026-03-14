@@ -98,7 +98,7 @@ contract SentinelPegReactive {
     bool    private vm;                  // true inside ReactVM
     address public  owner;               // deployer — can update reference price
     uint256 public  originChainId;       // e.g. 1 for Ethereum
-    uint256 public  destinationChainId;  // 130 for Unichain
+    uint256 public  destinationChainId;  // 1301 for Unichain Sepolia
     address public  monitoredPool;       // Uniswap V2 pool on origin
     address public  callbackTarget;      // SentinelPegHook on destination
     address public  stablecoinAddress;   // stablecoin on destination
@@ -128,7 +128,7 @@ contract SentinelPegReactive {
     // ─────────────────────────────────────────────────────────
 
     /// @param _originChainId       Chain with the monitored pool (1 = Ethereum)
-    /// @param _destinationChainId  Chain with the hook (130 = Unichain)
+    /// @param _destinationChainId  Chain with the hook (1301 = Unichain Sepolia)
     /// @param _monitoredPool       Uniswap V2 pair address on origin chain
     /// @param _callbackTarget      SentinelPegHook address on destination chain
     /// @param _stablecoin          Stablecoin address (used in callback payload)

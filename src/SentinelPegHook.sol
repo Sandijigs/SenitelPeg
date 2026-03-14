@@ -32,7 +32,7 @@ import {ISentinelPeg} from "./interfaces/ISentinelPeg.sol";
 ///          on origin chains and triggers updateDepegState() on this contract via
 ///          Reactive Network callbacks.  (see src/SentinelPegReactive.sol, lines 1–250)
 ///        • Unichain — this hook is designed and deployed as native stablecoin
-///          infrastructure on Unichain (chain ID 130).
+///          infrastructure on Unichain (chain ID 1301).
 contract SentinelPegHook is BaseHook, ISentinelPeg {
     using PoolIdLibrary for PoolKey;
     using LPFeeLibrary for uint24;
