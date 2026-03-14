@@ -142,7 +142,7 @@ export function Dashboard({
             </div>
 
             {/* Key metrics */}
-            <div className="flex gap-8">
+            <div className="flex flex-wrap gap-x-8 gap-y-4">
               <div>
                 <p className="text-xs text-white/35 mb-1">Swap Fee</p>
                 <p className="text-xl font-mono font-semibold transition-colors duration-500" style={{ color: c.color }}>
@@ -212,7 +212,7 @@ export function Dashboard({
           </div>
 
           {/* Balances */}
-          <div className="flex items-center gap-6 mb-6">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-6">
             <div className={`flex-1 rounded-xl p-4 transition-all duration-700 ${balanceFlash ? "bg-emerald-500/[0.08] border border-emerald-500/20" : "bg-white/[0.02] border border-white/[0.06]"}`}>
               <p className="text-xs text-white/35 mb-1">{balances?.token0Symbol ?? "spUSD"}</p>
               <p className={`text-lg font-mono font-semibold transition-colors duration-700 ${balanceFlash ? "text-emerald-400" : "text-white/80"}`}>

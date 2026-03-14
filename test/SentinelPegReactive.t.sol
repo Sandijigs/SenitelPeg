@@ -227,4 +227,94 @@ contract SentinelPegReactiveTest is Test {
         // so we use false for the data check
         reactive.react(_syncLog(r0, 1e18));
     }
+
+    // ═════════════════════════════════════════════════════════
+    //  7.  stablecoinIsToken0 = false path
+    // ═════════════════════════════════════════════════════════
+
+    function test_stablecoinIsToken1() public {
+        // Deploy a second reactive where stablecoin is token1 (not token0)
+        SentinelPegReactive reactive2 = new SentinelPegReactive(
+            ORIGIN, DESTINATION, POOL, HOOK, USDC_ADDR,
+            false,      // stablecoin is token1
+            REF_ETH_PRICE
+        );
+
+        // With stablecoinIsToken0=false: stableRes = r1, ethRes = r0
+        // To get impliedPrice = 3030: stableRes(r1)*1e12/ethRes(r0) = 3030
+        // So r1 = 3030e6, r0 = 1e18 (ETH is now token0)
+        uint112 r0 = 1e18;       // ETH (token0)
+        uint112 r1 = 3030e6;     // USDC (token1) — 1% drift
+
+        // Needs 2 confirmations for MILD
+        reactive2.react(_syncLog2(reactive2, r0, r1));
+        assertEq(uint8(reactive2.lastSeverity()), uint8(ISentinelPeg.DepegSeverity.NONE));
+
+        reactive2.react(_syncLog2(reactive2, r0, r1));
+        assertEq(uint8(reactive2.lastSeverity()), uint8(ISentinelPeg.DepegSeverity.MILD));
+    }
+
+    /// Helper for stablecoinIsToken1 tests
+    function _syncLog2(SentinelPegReactive r, uint112 r0, uint112 r1)
+        internal view returns (SentinelPegReactive.LogRecord memory)
+    {
+        return SentinelPegReactive.LogRecord({
+            chain_id:     ORIGIN,
+            _contract:    POOL,
+            topic_0:      r.SYNC_TOPIC_0(),
+            topic_1:      0,
+            topic_2:      0,
+            topic_3:      0,
+            data:         abi.encode(r0, r1),
+            block_number: 100,
+            op_code:      0,
+            block_hash:   0,
+            tx_hash:      0,
+            log_index:    0
+        });
+    }
+
+    // ═════════════════════════════════════════════════════════
+    //  8.  Boundary values at threshold edges
+    // ═════════════════════════════════════════════════════════
+
+    function test_exactMildThreshold() public {
+        // 50 bps = 0.5% drift → exactly MILD threshold
+        // impliedPrice = 3000 * 1.005 = 3015 → drift = 15/3000*10000 = 50 bps
+        uint112 r0 = 3015e6;
+        uint112 r1 = 1e18;
+
+        reactive.react(_syncLog(r0, r1));
+        reactive.react(_syncLog(r0, r1));
+        assertEq(uint8(reactive.lastSeverity()), uint8(ISentinelPeg.DepegSeverity.MILD),
+            "Exactly 50 bps should be MILD");
+    }
+
+    function test_justBelowMildThreshold() public {
+        // 49 bps → just below MILD threshold → NONE
+        // impliedPrice = 3000 * 1.0049 ≈ 3014.7 → use 3014e6
+        // drift = 14/3000*10000 = 46 bps → NONE
+        uint112 r0 = 3014e6;
+        uint112 r1 = 1e18;
+
+        reactive.react(_syncLog(r0, r1));
+        reactive.react(_syncLog(r0, r1));
+        assertEq(uint8(reactive.lastSeverity()), uint8(ISentinelPeg.DepegSeverity.NONE),
+            "Below 50 bps should remain NONE");
+    }
+
+    // ═════════════════════════════════════════════════════════
+    //  9.  Access control on updateReferencePrice
+    // ═════════════════════════════════════════════════════════
+
+    function test_updateReferencePriceRevertsInVM() public {
+        // In test env, vm=true, so updateReferencePrice should revert with ONLY_ON_RN
+        vm.expectRevert("ONLY_ON_RN");
+        reactive.updateReferencePrice(4000);
+    }
+
+    function test_ownerIsSetOnReactive() public view {
+        // The owner should be the test contract (deployer)
+        assertEq(reactive.owner(), address(this));
+    }
 }

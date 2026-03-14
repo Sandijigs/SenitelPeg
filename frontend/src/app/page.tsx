@@ -5,6 +5,8 @@ import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { HowItWorks } from "@/components/HowItWorks";
 import { Dashboard } from "@/components/Dashboard";
+import { ChainStatus } from "@/components/ChainStatus";
+import { TechSpecs } from "@/components/TechSpecs";
 import { Footer } from "@/components/Footer";
 import { useWallet } from "@/lib/useWallet";
 import type { LogEntry } from "@/lib/types";
@@ -53,6 +55,8 @@ export default function Page() {
           mintTestTokens={wallet.mintTestTokens}
           executeSwap={wallet.executeSwap}
         />
+        <ChainStatus />
+        <TechSpecs config={wallet.config} />
       </div>
 
       {!wallet.isConnected && (

@@ -8,7 +8,7 @@ import {
   POOL_KEY, MIN_SQRT_PRICE_LIMIT, MAX_SQRT_PRICE_LIMIT,
 } from "./constants";
 import type { Severity } from "./constants";
-import type { DepegState, ContractConfig, OnChainEvent, TokenBalances } from "./types";
+import type { DepegState, ContractConfig, TokenBalances } from "./types";
 
 declare global {
   interface Window {
@@ -25,10 +25,8 @@ const SEV_LABELS = ["NONE", "MILD", "SEVERE", "CRITICAL"] as const;
 
 export function useWallet(addLog: (msg: string) => void) {
   const [address, setAddress] = useState<string | null>(null);
-  const [contract, setContract] = useState<Contract | null>(null);
   const [config, setConfig] = useState<ContractConfig | null>(null);
   const [liveDepeg, setLiveDepeg] = useState<DepegState | null>(null);
-  const [recentEvents, setRecentEvents] = useState<OnChainEvent[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [balances, setBalances] = useState<TokenBalances | null>(null);
@@ -112,40 +110,6 @@ export function useWallet(addLog: (msg: string) => void) {
     },
     [],
   );
-
-  /** Read recent DepegStateUpdated events from chain history */
-  const readRecentEvents = useCallback(async (c: Contract) => {
-    try {
-      const filter = c.filters.DepegStateUpdated(STABLECOIN);
-      // Query last ~5000 blocks for events
-      const currentBlock = await c.runner?.provider?.getBlockNumber();
-      if (!currentBlock) return;
-      const fromBlock = Math.max(0, currentBlock - 5000);
-      const logs = await c.queryFilter(filter, fromBlock, currentBlock);
-
-      const events: OnChainEvent[] = logs.slice(-20).map((log) => {
-        const parsed = c.interface.parseLog({ topics: log.topics as string[], data: log.data });
-        return {
-          id: `${log.transactionHash}-${log.index}`,
-          event: "DepegStateUpdated",
-          blockNumber: log.blockNumber,
-          txHash: log.transactionHash,
-          args: {
-            oldSeverity: Number(parsed?.args[1] ?? 0),
-            newSeverity: Number(parsed?.args[2] ?? 0),
-            driftBps: Number(parsed?.args[3] ?? 0),
-          },
-        };
-      });
-
-      setRecentEvents(events);
-      if (events.length > 0) {
-        addLog(`Loaded ${events.length} historical DepegStateUpdated events`);
-      }
-    } catch {
-      // Event query not supported on all RPCs — non-critical
-    }
-  }, [addLog]);
 
   /** Ensure wallet is on Unichain Sepolia */
   const ensureNetwork = useCallback(async (): Promise<BrowserProvider | null> => {
@@ -360,7 +324,6 @@ export function useWallet(addLog: (msg: string) => void) {
         addLog("Swap rejected by user");
       } else if (msg.includes("0x7c9c6e8f") || msg.includes("PriceLimitAlreadyExceeded")) {
         // Pool price has been pushed to the boundary of the liquidity range
-        const direction = zeroForOne ? "opposite" : "opposite";
         const b = prevBalancesRef.current;
         const suggestion = zeroForOne
           ? `${b?.token1Symbol ?? "token1"} → ${b?.token0Symbol ?? "token0"}`
@@ -396,7 +359,6 @@ export function useWallet(addLog: (msg: string) => void) {
       contractRef.current = hookContract;
 
       setAddress(addr);
-      setContract(hookContract);
       addLog(`Wallet connected: ${addr.slice(0, 6)}...${addr.slice(-4)}`);
       addLog(`Network: Unichain Sepolia (${CHAIN_ID})`);
 
@@ -422,12 +384,19 @@ export function useWallet(addLog: (msg: string) => void) {
         addLog("Failed to read contract state — verify deployment");
       }
 
-      // Read balances and historical events (non-blocking)
+      // Read balances (non-blocking)
       readBalances();
-      readRecentEvents(hookContract);
 
       // Subscribe to live events
       subscribeToEvents(hookContract);
+
+      // Listen for MetaMask account/chain changes
+      if (window.ethereum?.on) {
+        const handleAccountsChanged = () => { window.location.reload(); };
+        const handleChainChanged = () => { window.location.reload(); };
+        window.ethereum.on("accountsChanged", handleAccountsChanged);
+        window.ethereum.on("chainChanged", handleChainChanged);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("user rejected")) {
@@ -438,7 +407,7 @@ export function useWallet(addLog: (msg: string) => void) {
     } finally {
       setConnecting(false);
     }
-  }, [addLog, ensureNetwork, readConfig, readHookState, readRecentEvents, readBalances, subscribeToEvents]);
+  }, [addLog, ensureNetwork, readConfig, readHookState, readBalances, subscribeToEvents]);
 
   /** Trigger on-chain state change (owner only — demonstrates Reactive callback) */
   const triggerStateChange = useCallback(
@@ -510,7 +479,6 @@ export function useWallet(addLog: (msg: string) => void) {
     connecting,
     config,
     liveDepeg,
-    recentEvents,
     balances,
     swapping,
     minting,

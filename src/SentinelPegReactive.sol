@@ -96,6 +96,7 @@ contract SentinelPegReactive {
     // ─────────────────────────────────────────────────────────
 
     bool    private vm;                  // true inside ReactVM
+    address public  owner;               // deployer — can update reference price
     uint256 public  originChainId;       // e.g. 1 for Ethereum
     uint256 public  destinationChainId;  // 130 for Unichain
     address public  monitoredPool;       // Uniswap V2 pool on origin
@@ -114,6 +115,11 @@ contract SentinelPegReactive {
 
     modifier vmOnly() {
         require(vm, "NOT_IN_REACTVM");
+        _;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "NOT_OWNER");
         _;
     }
 
@@ -137,6 +143,7 @@ contract SentinelPegReactive {
         bool    _stablecoinIsToken0,
         uint256 _refEthPrice
     ) payable {
+        owner              = msg.sender;
         originChainId      = _originChainId;
         destinationChainId = _destinationChainId;
         monitoredPool      = _monitoredPool;
@@ -268,7 +275,7 @@ contract SentinelPegReactive {
     //  Admin  (callable on Reactive Network instance only)
     // ─────────────────────────────────────────────────────────
 
-    function updateReferencePrice(uint256 p) external {
+    function updateReferencePrice(uint256 p) external onlyOwner {
         require(!vm, "ONLY_ON_RN");
         referenceEthPrice = p;
     }

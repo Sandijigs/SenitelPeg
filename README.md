@@ -193,13 +193,13 @@ This installs all Solidity dependencies (v4-core, v4-periphery, forge-std, OpenZ
 ### Run Tests
 
 ```bash
-# All 66 tests
+# All 76 tests
 forge test -vvv
 
-# Only hook tests (42 tests)
+# Only hook tests (47 tests)
 forge test --match-contract SentinelPegHookTest -vvv
 
-# Only reactive contract tests (13 tests)
+# Only reactive contract tests (18 tests)
 forge test --match-contract SentinelPegReactiveTest -vvv
 
 # End-to-end integration tests (11 tests)
@@ -355,12 +355,12 @@ During a severe depeg, LPs racing to exit create a bank-run dynamic that deepens
 
 ## Test Coverage
 
-**66 tests across 3 test suites — all passing.**
+**76 tests across 3 test suites — all passing.**
 
 | Suite | Tests | Description |
 |-------|-------|-------------|
-| `SentinelPegHookTest` | 42 | Hook deployment, fee tiers, staleness, access control, events, swap integration, volume tracking, LP withdrawal blocking, multi-stablecoin support, edge cases |
-| `SentinelPegReactiveTest` | 13 | Constructor config, severity classification, confirmation logic, callback emission, edge cases |
+| `SentinelPegHookTest` | 47 | Hook deployment, fee tiers, staleness boundary, access control, events, swap integration (both directions), volume tracking (incl. stale exclusion), LP withdrawal blocking, multi-stablecoin support, edge cases |
+| `SentinelPegReactiveTest` | 18 | Constructor config, severity classification, confirmation logic, callback emission, stablecoinIsToken0/token1 paths, boundary threshold tests, access control, edge cases |
 | `SentinelPegE2ETest` | 11 | Full pipeline: reactive event → hook state → fee override → swap execution, LP withdrawal blocking under depeg |
 
 ---

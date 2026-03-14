@@ -522,4 +522,53 @@ contract SentinelPegHookTest is Test, Deployers {
         swap(poolKey, true, -0.001 ether, ZERO_BYTES);
         assertGt(hook.totalProtectedVolume(), 0, "Total protected volume should increase");
     }
+
+    // ═════════════════════════════════════════════════════════
+    //  13.  Boundary & additional edge cases
+    // ═════════════════════════════════════════════════════════
+
+    function test_stalenessExactBoundaryNotStale() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.SEVERE, 300);
+
+        // Warp to exactly the threshold — should NOT be stale (uses > not >=)
+        vm.warp(block.timestamp + 3600);
+        (, , , bool stale) = hook.getDepegState(USDC);
+        assertFalse(stale, "Exactly at threshold should not be stale");
+        assertEq(hook.getCurrentFee(USDC), hook.FEE_SEVERE());
+    }
+
+    function test_setCallbackSourceAccessControl() public {
+        vm.prank(address(0xBEEF));
+        vm.expectRevert(ISentinelPeg.NotOwner.selector);
+        hook.setCallbackSource(address(0xCA11));
+    }
+
+    function test_setStalenessThresholdAccessControl() public {
+        vm.prank(address(0xBEEF));
+        vm.expectRevert(ISentinelPeg.NotOwner.selector);
+        hook.setStalenessThreshold(7200);
+    }
+
+    function test_swapOneForZeroDirection() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.MILD, 100);
+
+        // Swap in the opposite direction (oneForZero)
+        swap(poolKey, false, -0.001 ether, ZERO_BYTES);
+    }
+
+    function test_noVolumeTrackedWhenStale() public {
+        hook.setDepegState(USDC, ISentinelPeg.DepegSeverity.SEVERE, 300);
+
+        swap(poolKey, true, -0.001 ether, ZERO_BYTES);
+        uint256 vol1 = hook.getProtectedVolume(poolKey);
+        assertGt(vol1, 0, "Volume tracked before stale");
+
+        // Make data stale
+        vm.warp(block.timestamp + 3601);
+
+        // Swap while stale — volume should NOT increase
+        swap(poolKey, true, -0.001 ether, ZERO_BYTES);
+        uint256 vol2 = hook.getProtectedVolume(poolKey);
+        assertEq(vol2, vol1, "No volume tracked when data is stale");
+    }
 }
