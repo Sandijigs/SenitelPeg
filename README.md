@@ -118,14 +118,14 @@ Fees automatically return to normal and LP withdrawals re-open as peg stability 
 
 SentinelPeg uses Reactive Network as its core cross-chain monitoring and automation layer. The integration is **not theoretical** — `SentinelPegReactive.sol` is a fully functional Reactive Smart Contract deployed on the Lasna testnet that:
 
-- **Subscribes** to `Sync(uint112,uint112)` events from a Uniswap V2 USDC/WETH pool on Ethereum Sepolia via the Reactive Network system contract (`service.subscribe()` in constructor, line 148–158 of `src/SentinelPegReactive.sol`)
-- **Processes events** in the `react()` function (line 168–210), decoding pool reserves and calculating implied stablecoin price drift
-- **Triggers cross-chain callbacks** by emitting the `Callback` event (line 206) with an encoded `updateDepegState()` payload that Reactive Network relays to the SentinelPeg hook on Unichain
-- **Implements confirmation logic** (line 183–198) requiring 2 consecutive readings before changing severity to filter out noise, with an exception for CRITICAL severity which triggers immediately
+- **Subscribes** to `Sync(uint112,uint112)` events from a Uniswap V2 USDC/WETH pool on Ethereum Sepolia via the Reactive Network system contract (`service.subscribe()` in constructor, line 162–176 of `src/SentinelPegReactive.sol`)
+- **Processes events** in the `react()` function (line 187–231), decoding pool reserves and calculating implied stablecoin price drift
+- **Triggers cross-chain callbacks** by emitting the `Callback` event (line 229) with an encoded `updateDepegState()` payload that Reactive Network relays to the SentinelPeg hook on Unichain
+- **Implements confirmation logic** (line 198–213) requiring 2 consecutive readings before changing severity to filter out noise, with an exception for CRITICAL severity which triggers immediately
 
 Code references:
 - `src/SentinelPegReactive.sol` — Reactive Smart Contract (full implementation)
-- `src/SentinelPegHook.sol:169` — `updateDepegState()` callback receiver
+- `src/SentinelPegHook.sol:235` — `updateDepegState()` callback receiver
 
 ### Unichain
 
@@ -147,8 +147,8 @@ sentinelpeg/
 │   └── interfaces/
 │       └── ISentinelPeg.sol          # Shared types, events, errors
 ├── test/
-│   ├── SentinelPegHook.t.sol         # Hook unit tests (42 tests)
-│   ├── SentinelPegReactive.t.sol     # Reactive contract tests (13 tests)
+│   ├── SentinelPegHook.t.sol         # Hook unit tests (47 tests)
+│   ├── SentinelPegReactive.t.sol     # Reactive contract tests (18 tests)
 │   └── SentinelPegE2E.t.sol          # End-to-end integration tests (11 tests)
 ├── script/
 │   ├── DeployHook.s.sol              # Deploy hook to Unichain (CREATE2 + HookMiner)
