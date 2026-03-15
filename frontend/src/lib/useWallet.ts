@@ -472,6 +472,31 @@ export function useWallet(addLog: (msg: string) => void) {
     }
   }, [readHookState, addLog]);
 
+  /** Disconnect wallet — revokes MetaMask permissions so next connect shows the popup */
+  const disconnect = useCallback(async () => {
+    listenerCleanup.current?.();
+    listenerCleanup.current = null;
+    contractRef.current = null;
+    signerRef.current = null;
+    prevBalancesRef.current = null;
+
+    try {
+      await window.ethereum?.request({
+        method: "wallet_revokePermissions",
+        params: [{ eth_accounts: {} }],
+      });
+    } catch {
+      // Older MetaMask versions may not support wallet_revokePermissions — state reset is enough
+    }
+
+    setAddress(null);
+    setConfig(null);
+    setLiveDepeg(null);
+    setIsOwner(false);
+    setBalances(null);
+    addLog("Wallet disconnected");
+  }, [addLog]);
+
   return {
     address,
     isConnected: !!address,
@@ -483,6 +508,7 @@ export function useWallet(addLog: (msg: string) => void) {
     swapping,
     minting,
     connect,
+    disconnect,
     triggerStateChange,
     refreshState,
     mintTestTokens,

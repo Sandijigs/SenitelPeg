@@ -37,6 +37,7 @@ export default function Page() {
         address={wallet.address}
         connecting={wallet.connecting}
         onConnect={handleConnect}
+        onDisconnect={wallet.disconnect}
       />
       <Hero onConnect={handleConnect} isConnected={wallet.isConnected} connecting={wallet.connecting} />
       <HowItWorks />
