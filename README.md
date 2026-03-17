@@ -6,6 +6,9 @@ SentinelPeg is a Uniswap v4 hook that protects stablecoin LPs from depeg events 
 
 > **Hookathon Submission** — UHI8 "Specialized Markets" theme
 
+[![Demo Video](https://img.shields.io/badge/Demo-YouTube-red?logo=youtube)](https://www.youtube.com/watch?v=jQOQW_oD8PU)
+[![Live App](https://img.shields.io/badge/Live-sentinelpeg.vercel.app-black?logo=vercel)](https://sentinelpeg.vercel.app)
+
 ---
 
 ## The Problem
@@ -25,18 +28,17 @@ SentinelPeg combines **Uniswap v4 dynamic fee hooks** with **Reactive Network's 
 1. A **Reactive Smart Contract** on Reactive Network continuously monitors stablecoin pool reserves on Ethereum (or other origin chains)
 2. When price deviation is detected, the reactive contract classifies severity and sends a **cross-chain callback** to the hook on Unichain
 3. The **SentinelPeg hook** responds across three Uniswap v4 hook points:
-
    - **`beforeSwap`** — reads current severity and returns a dynamic fee override to the PoolManager
    - **`afterSwap`** — tracks cumulative swap volume during depeg events (protected volume metric)
    - **`beforeRemoveLiquidity`** — blocks LP withdrawals during CRITICAL depeg to prevent bank runs
 
-| Severity | Price Drift | Fee | LP Withdrawals | Rationale |
-|----------|-------------|-----|----------------|-----------|
-| **NONE** | < 0.5% | 0.05% | Open | Normal operation — competitive fees |
-| **MILD** | 0.5% – 2% | 0.30% | Open | Elevated risk — compensate LPs |
-| **SEVERE** | 2% – 5% | 1.00% | Open | High risk — discourage pool draining |
-| **CRITICAL** | > 5% | 5.00% | **Blocked** | Crisis mode — maximum LP protection |
-| **STALE** | data too old | 0.30% | Open | Conservative fallback |
+| Severity     | Price Drift  | Fee   | LP Withdrawals | Rationale                            |
+| ------------ | ------------ | ----- | -------------- | ------------------------------------ |
+| **NONE**     | < 0.5%       | 0.05% | Open           | Normal operation — competitive fees  |
+| **MILD**     | 0.5% – 2%    | 0.30% | Open           | Elevated risk — compensate LPs       |
+| **SEVERE**   | 2% – 5%      | 1.00% | Open           | High risk — discourage pool draining |
+| **CRITICAL** | > 5%         | 5.00% | **Blocked**    | Crisis mode — maximum LP protection  |
+| **STALE**    | data too old | 0.30% | Open           | Conservative fallback                |
 
 Fees automatically return to normal and LP withdrawals re-open as peg stability is restored.
 
@@ -101,14 +103,14 @@ Fees automatically return to normal and LP withdrawals re-open as peg stability 
 
 ## Deployed Contracts (Testnet)
 
-| Contract | Network | Address |
-|----------|---------|---------|
-| SentinelPegHook | Unichain Sepolia | [`0x8051EE84c86dBa66e72Bf51336e6059D41aa6080`](https://unichain-sepolia.blockscout.com/address/0x8051EE84c86dBa66e72Bf51336e6059D41aa6080) |
-| SentinelPegReactive | Reactive Lasna | [`0x330eFe22a73AAD374b887d6F77cd90fa16b6cC60`](https://lasna.reactscan.net/address/0x330eFe22a73AAD374b887d6F77cd90fa16b6cC60) |
-| Callback Proxy | Unichain Sepolia | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4` |
+| Contract                | Network          | Address                                                                                                                                    |
+| ----------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| SentinelPegHook         | Unichain Sepolia | [`0x8051EE84c86dBa66e72Bf51336e6059D41aa6080`](https://unichain-sepolia.blockscout.com/address/0x8051EE84c86dBa66e72Bf51336e6059D41aa6080) |
+| SentinelPegReactive     | Reactive Lasna   | [`0x330eFe22a73AAD374b887d6F77cd90fa16b6cC60`](https://lasna.reactscan.net/address/0x330eFe22a73AAD374b887d6F77cd90fa16b6cC60)             |
+| Callback Proxy          | Unichain Sepolia | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4`                                                                                               |
 | spUSD (test stablecoin) | Unichain Sepolia | [`0x03540C0af2350218C206168e0F758450Db84e179`](https://unichain-sepolia.blockscout.com/address/0x03540C0af2350218C206168e0F758450Db84e179) |
-| spETH (test token) | Unichain Sepolia | [`0x891Fc6d2dFEd0f5ff4Db00690eB552eB029564a8`](https://unichain-sepolia.blockscout.com/address/0x891Fc6d2dFEd0f5ff4Db00690eB552eB029564a8) |
-| PoolSwapTest (router) | Unichain Sepolia | [`0xE626df117052511f5bF4E5299e317AFFfD5949Cd`](https://unichain-sepolia.blockscout.com/address/0xE626df117052511f5bF4E5299e317AFFfD5949Cd) |
+| spETH (test token)      | Unichain Sepolia | [`0x891Fc6d2dFEd0f5ff4Db00690eB552eB029564a8`](https://unichain-sepolia.blockscout.com/address/0x891Fc6d2dFEd0f5ff4Db00690eB552eB029564a8) |
+| PoolSwapTest (router)   | Unichain Sepolia | [`0xE626df117052511f5bF4E5299e317AFFfD5949Cd`](https://unichain-sepolia.blockscout.com/address/0xE626df117052511f5bF4E5299e317AFFfD5949Cd) |
 
 ---
 
@@ -124,6 +126,7 @@ SentinelPeg uses Reactive Network as its core cross-chain monitoring and automat
 - **Implements confirmation logic** (line 198–213) requiring 2 consecutive readings before changing severity to filter out noise, with an exception for CRITICAL severity which triggers immediately
 
 Code references:
+
 - `src/SentinelPegReactive.sol` — Reactive Smart Contract (full implementation)
 - `src/SentinelPegHook.sol:235` — `updateDepegState()` callback receiver
 
@@ -234,11 +237,11 @@ The dashboard connects to the deployed hook on Unichain Sepolia via MetaMask. It
 
 The project is configured for testnet deployment across three networks:
 
-| Network | Chain ID | Role |
-|---------|----------|------|
-| Ethereum Sepolia | 11155111 | Origin chain — monitored USDC/ETH pool |
-| Reactive Lasna | 5318007 | Cross-chain monitoring and callback relay |
-| Unichain Sepolia | 1301 | Destination — hook deployed here |
+| Network          | Chain ID | Role                                      |
+| ---------------- | -------- | ----------------------------------------- |
+| Ethereum Sepolia | 11155111 | Origin chain — monitored USDC/ETH pool    |
+| Reactive Lasna   | 5318007  | Cross-chain monitoring and callback relay |
+| Unichain Sepolia | 1301     | Destination — hook deployed here          |
 
 > **Note:** Reactive Network requires all chains (origin + destination) to be either testnets or mainnets — mixing is not supported. Kopli testnet is deprecated; Lasna is the active testnet.
 
@@ -357,11 +360,11 @@ During a severe depeg, LPs racing to exit create a bank-run dynamic that deepens
 
 **76 tests across 3 test suites — all passing.**
 
-| Suite | Tests | Description |
-|-------|-------|-------------|
-| `SentinelPegHookTest` | 47 | Hook deployment, fee tiers, staleness boundary, access control, events, swap integration (both directions), volume tracking (incl. stale exclusion), LP withdrawal blocking, multi-stablecoin support, edge cases |
-| `SentinelPegReactiveTest` | 18 | Constructor config, severity classification, confirmation logic, callback emission, stablecoinIsToken0/token1 paths, boundary threshold tests, access control, edge cases |
-| `SentinelPegE2ETest` | 11 | Full pipeline: reactive event → hook state → fee override → swap execution, LP withdrawal blocking under depeg |
+| Suite                     | Tests | Description                                                                                                                                                                                                       |
+| ------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SentinelPegHookTest`     | 47    | Hook deployment, fee tiers, staleness boundary, access control, events, swap integration (both directions), volume tracking (incl. stale exclusion), LP withdrawal blocking, multi-stablecoin support, edge cases |
+| `SentinelPegReactiveTest` | 18    | Constructor config, severity classification, confirmation logic, callback emission, stablecoinIsToken0/token1 paths, boundary threshold tests, access control, edge cases                                         |
+| `SentinelPegE2ETest`      | 11    | Full pipeline: reactive event → hook state → fee override → swap execution, LP withdrawal blocking under depeg                                                                                                    |
 
 ---
 
