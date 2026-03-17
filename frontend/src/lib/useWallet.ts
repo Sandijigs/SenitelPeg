@@ -426,6 +426,9 @@ export function useWallet(addLog: (msg: string) => void) {
         await tx.wait();
         addLog("Transaction confirmed");
 
+        // Wait for RPC to index the new state before reading
+        await new Promise((r) => setTimeout(r, 2000));
+
         // Read verified on-chain state
         const state = await readHookState(c);
         if (state) {
