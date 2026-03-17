@@ -24,7 +24,7 @@ function LogMessage({ text }: { text: string }) {
 }
 
 function formatFee(bps: number): string {
-  return `${(bps / 100).toFixed(2)}%`;
+  return `${(bps / 10000).toFixed(2)}%`;
 }
 
 function timeAgo(updatedAt: number): string {

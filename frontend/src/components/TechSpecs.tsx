@@ -1,7 +1,7 @@
 import type { ContractConfig } from "@/lib/types";
 
 function formatFee(bps: number): string {
-  return `${(bps / 100).toFixed(2)}%`;
+  return `${(bps / 10000).toFixed(2)}%`;
 }
 
 interface TechSpecsProps {
